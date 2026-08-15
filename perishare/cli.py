@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import logging
+import os
 import sys
 
 from . import __version__, config as config_mod
@@ -90,6 +91,28 @@ def _cmd_devices() -> int:
     return 0
 
 
+def _user_in_group(name: str) -> bool:
+    """Verifica se o usuário atual pertence ao grupo *name*.
+
+    Cobre os dois casos: o grupo já ativo na sessão (os.getgroups) e o grupo
+    atribuído mas ainda não aplicado por falta de novo login (gr_mem).
+    """
+    try:
+        import grp
+
+        entry = grp.getgrnam(name)
+    except (KeyError, ImportError):
+        return False
+    if entry.gr_gid in os.getgroups():
+        return True
+    try:
+        import getpass
+
+        return getpass.getuser() in entry.gr_mem
+    except Exception:
+        return os.environ.get("USER", "") in entry.gr_mem
+
+
 def _cmd_input_devices() -> int:
     """Diagnóstico (somente leitura) do backend evdev: dispositivos e permissões.
 
@@ -144,6 +167,40 @@ def _cmd_input_devices() -> int:
             f"\n{denied} dispositivo(s) sem permissão. Entre no grupo 'input':\n"
             "  sudo usermod -aG input $USER    (e refaça o login)"
         )
+
+    if readable == 0:
+        # O evdev.list_devices() oculta os dispositivos que não consegue abrir,
+        # então "0 legíveis" costuma ser falta de permissão, não ausência de
+        # hardware. Diagnostica melhor olhando os nós brutos e o grupo 'input'.
+        import glob
+
+        nodes = glob.glob("/dev/input/event*")
+        print()
+        if not nodes:
+            print(
+                "Nenhum /dev/input/event* existe. Isso é raro: verifique se há "
+                "teclado/mouse conectados e se o kernel os expõe."
+            )
+        elif _user_in_group("input"):
+            print(
+                f"Existem {len(nodes)} dispositivos em /dev/input, mas nenhum é "
+                "legível nesta sessão.\n"
+                "Você JÁ está no grupo 'input', mas a sessão atual ainda não o "
+                "aplicou.\n"
+                "  -> Faça logout/login (ou reinicie) e tente de novo.\n"
+                "  -> Teste rápido nesta shell: newgrp input && perishare input-devices"
+            )
+        else:
+            print(
+                f"Existem {len(nodes)} dispositivos em /dev/input, mas você não "
+                "tem permissão de leitura.\n"
+                "Você NÃO está no grupo 'input'. Rode:\n"
+                "  sudo usermod -aG input $USER\n"
+                "e faça logout/login (o grupo só passa a valer em sessões novas).\n"
+                "Obs.: no Qtile (backend evdev) isso é necessário. Se preferir o "
+                'backend pynput (X11), defina backend = "pynput" e este acesso '
+                "não é preciso no servidor."
+            )
 
     # Acesso ao /dev/uinput (injeção). Testa sem manter o dispositivo aberto.
     print()
