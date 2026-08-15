@@ -38,17 +38,23 @@ Requisito comum: **Python 3.11 ou mais novo**.
 Opção A — pacote nativo (recomendada):
 
 ```bash
-yay -S python-pynput          # dependência do AUR
+# Dependências do AUR (o makepkg NÃO as resolve sozinho — instale antes).
+# python-evdev, python-cryptography e tk vêm dos repositórios oficiais.
+yay -S python-pynput python-sounddevice
 git clone https://github.com/CauaVenturaDev/Desktop-laptop.git
 cd Desktop-laptop/packaging/arch
 makepkg -si
 ```
 
-Opção B — pipx:
+> Se aparecer `target not found: python-sounddevice` (ou `python-pynput`), é
+> porque essas duas dependências estão no AUR e o `makepkg -si` só resolve as
+> dos repositórios oficiais. Instale-as antes com `yay -S python-pynput
+> python-sounddevice` (ou outro auxiliar do AUR) e rode o `makepkg -si` de novo.
+
+Opção B — pipx (puxa as dependências Python do PyPI, sem AUR):
 
 ```bash
-sudo pacman -S python-pipx tk python-evdev
-yay -S python-pynput
+sudo pacman -S python-pipx tk portaudio
 git clone https://github.com/CauaVenturaDev/Desktop-laptop.git
 pipx install ./Desktop-laptop
 ```

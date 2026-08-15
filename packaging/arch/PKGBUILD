@@ -1,7 +1,11 @@
 # Maintainer: CauaVenturaDev
 # Build local a partir do repositório git (estilo AUR -git).
 # Uso: cd packaging/arch && makepkg -si
-# Dependência do AUR: python-pynput (instale antes, ex.: yay -S python-pynput)
+#
+# ATENÇÃO: duas dependências estão no AUR e o 'makepkg -si' NÃO as resolve
+# sozinho (ele só instala deps dos repositórios oficiais). Instale-as antes:
+#   yay -S python-pynput python-sounddevice
+# As demais (python-evdev, python-cryptography, tk) vêm dos repos oficiais.
 
 pkgname=perishare-git
 pkgver=r1
