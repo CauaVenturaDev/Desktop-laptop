@@ -27,7 +27,7 @@ _DEFAULTS = {
         "listen_host": "0.0.0.0",
         "server_host": "127.0.0.1",
         "port": 42800,
-        "toggle_hotkey": "<ctrl>+<alt>+<f12>",
+        "toggle_hotkey": "<ctrl>+<alt>+<end>",
         "backend": "auto",
         "grab": True,
     },
@@ -63,7 +63,9 @@ listen_host = "0.0.0.0"
 server_host = "192.168.0.10"
 port = 42800
 # Atalho que alterna o controle entre a máquina local e a remota.
-toggle_hotkey = "<ctrl>+<alt>+<f12>"
+# Evite <ctrl>+<alt>+<f1..f12>: no Linux servem para trocar de terminal (TTY)
+# e podem não chegar ao app. Formato do pynput (ex.: <ctrl>+<alt>+<home>).
+toggle_hotkey = "<ctrl>+<alt>+<end>"
 # Backend de captura/injeção de teclado e mouse:
 #   "auto"   -> escolhe sozinho (Windows/X11 = pynput; Wayland = evdev);
 #   "pynput" -> X11 e Windows, sem permissões especiais (não funciona em Wayland);

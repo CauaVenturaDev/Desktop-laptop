@@ -69,11 +69,11 @@ class EvdevServerStateMachineTest(unittest.TestCase):
     def _toggle_hotkey(self, server):
         self._feed(server, _key(ecodes.KEY_LEFTCTRL, 1))
         self._feed(server, _key(ecodes.KEY_LEFTALT, 1))
-        self._feed(server, _key(ecodes.KEY_F12, 1))
+        self._feed(server, _key(ecodes.KEY_END, 1))
 
     def _release_hotkey(self, server):
         # Como no uso real: o usuário solta o atalho antes de continuar.
-        self._feed(server, _key(ecodes.KEY_F12, 0))
+        self._feed(server, _key(ecodes.KEY_END, 0))
         self._feed(server, _key(ecodes.KEY_LEFTALT, 0))
         self._feed(server, _key(ecodes.KEY_LEFTCTRL, 0))
 
@@ -109,7 +109,7 @@ class EvdevServerStateMachineTest(unittest.TestCase):
         self._toggle_hotkey(server)
         self.captured.clear()
         # Soltar os modificadores do atalho não deve virar "release" na remota.
-        self._feed(server, _key(ecodes.KEY_F12, 0))
+        self._feed(server, _key(ecodes.KEY_END, 0))
         self._feed(server, _key(ecodes.KEY_LEFTALT, 0))
         self._feed(server, _key(ecodes.KEY_LEFTCTRL, 0))
         self.assertEqual(self.captured, [])
@@ -171,7 +171,7 @@ class EvdevServerStateMachineTest(unittest.TestCase):
         self._toggle_hotkey(server)
         self.assertTrue(server._remote)
         # Solta o atalho e aciona de novo para voltar ao local.
-        self._feed(server, _key(ecodes.KEY_F12, 0))
+        self._feed(server, _key(ecodes.KEY_END, 0))
         self._feed(server, _key(ecodes.KEY_LEFTALT, 0))
         self._feed(server, _key(ecodes.KEY_LEFTCTRL, 0))
         self._toggle_hotkey(server)

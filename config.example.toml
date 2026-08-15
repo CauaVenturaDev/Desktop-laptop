@@ -11,7 +11,7 @@ encrypt = true
 listen_host = "0.0.0.0"        # usado pelo input-server
 server_host = "192.168.0.10"   # usado pelo input-client: IP do servidor
 port = 42800
-toggle_hotkey = "<ctrl>+<alt>+<f12>"
+toggle_hotkey = "<ctrl>+<alt>+<end>"   # evite F1..F12: conflitam com troca de TTY
 # "auto" (Windows/X11 = pynput, Wayland = evdev), "pynput" ou "evdev".
 # O backend "evdev" funciona em Wayland/Hyprland; veja o README (permissões).
 backend = "auto"

@@ -5,7 +5,7 @@ duas funções:
 
 1. **Teclado e mouse (KVM por software)** — use o teclado e o mouse de um
    computador para controlar o outro, alternando com um atalho
-   (padrão: `Ctrl+Alt+F12`).
+   (padrão: `Ctrl+Alt+End`).
 2. **Áudio / fones de ouvido** — o som de um computador é transmitido pela
    rede e reproduzido nos fones conectados ao outro.
 
@@ -113,10 +113,17 @@ Na máquina a ser controlada (ex.: laptop):
 perishare input-client
 ```
 
-Pressione **`Ctrl+Alt+F12`** (configurável em `toggle_hotkey`) para enviar o
-teclado/mouse para a máquina remota; pressione de novo para voltar. Se a
-conexão cair, o controle volta automaticamente para a máquina local e as
-teclas pressionadas são soltas na remota.
+No **teclado da máquina servidora** (onde a captura acontece), pressione
+**`Ctrl+Alt+End`** (configurável em `toggle_hotkey`) para enviar o
+teclado/mouse para a máquina remota; pressione de novo para voltar. O atalho
+é detectado só no servidor — não adianta pressioná-lo no cliente. Se a conexão
+cair, o controle volta automaticamente para a máquina local e as teclas
+pressionadas são soltas na remota.
+
+> Evite `Ctrl+Alt+F1`…`F12` como atalho: no Linux são reservados para trocar
+> de terminal virtual (TTY) e o kernel/X11 podem interceptá-los antes do app.
+> Com o backend `evdev` no servidor, o atalho é lido direto do kernel, o que é
+> mais confiável do que com `pynput` em X11.
 
 ### Backend de entrada e Wayland
 

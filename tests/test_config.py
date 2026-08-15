@@ -19,7 +19,7 @@ class ConfigTest(unittest.TestCase):
             self.assertTrue(cfg_a.encrypt)
             self.assertEqual(cfg_a.input_port, 42800)
             self.assertEqual(cfg_a.audio_port, 42801)
-            self.assertEqual(cfg_a.toggle_hotkey, "<ctrl>+<alt>+<f12>")
+            self.assertEqual(cfg_a.toggle_hotkey, "<ctrl>+<alt>+<end>")
 
     def test_existing_file_not_overwritten(self):
         with tempfile.TemporaryDirectory() as tmp:
