@@ -34,14 +34,14 @@ _SERVICES = (
     (
         "Servidor de entrada",
         "envia o teclado/mouse desta máquina",
-        "perishare.inputshare.server",
-        "InputServer",
+        "perishare.inputshare.backends",
+        "make_input_server",
     ),
     (
         "Cliente de entrada",
         "esta máquina é controlada pela outra",
-        "perishare.inputshare.client",
-        "InputClient",
+        "perishare.inputshare.backends",
+        "make_input_client",
     ),
     (
         "Emissor de áudio",

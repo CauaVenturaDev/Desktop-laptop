@@ -12,6 +12,12 @@ listen_host = "0.0.0.0"        # usado pelo input-server
 server_host = "192.168.0.10"   # usado pelo input-client: IP do servidor
 port = 42800
 toggle_hotkey = "<ctrl>+<alt>+<f12>"
+# "auto" (Windows/X11 = pynput, Wayland = evdev), "pynput" ou "evdev".
+# O backend "evdev" funciona em Wayland/Hyprland; veja o README (permissões).
+backend = "auto"
+# Só no evdev: captura exclusiva no modo remoto (true = KVM; false = sem risco
+# de "trancar", a entrada vai às duas máquinas). Atalho/saída sempre liberam.
+grab = true
 
 [audio]  # Função 2: áudio / fones de ouvido
 listen_host = "0.0.0.0"        # usado pelo audio-send

@@ -28,6 +28,8 @@ _DEFAULTS = {
         "server_host": "127.0.0.1",
         "port": 42800,
         "toggle_hotkey": "<ctrl>+<alt>+<f12>",
+        "backend": "auto",
+        "grab": True,
     },
     "audio": {
         "listen_host": "0.0.0.0",
@@ -62,6 +64,18 @@ server_host = "192.168.0.10"
 port = 42800
 # Atalho que alterna o controle entre a máquina local e a remota.
 toggle_hotkey = "<ctrl>+<alt>+<f12>"
+# Backend de captura/injeção de teclado e mouse:
+#   "auto"   -> escolhe sozinho (Windows/X11 = pynput; Wayland = evdev);
+#   "pynput" -> X11 e Windows, sem permissões especiais (não funciona em Wayland);
+#   "evdev"  -> Linux em nível de kernel; funciona em Wayland/Hyprland, X11 e
+#               console, mas exige acesso a /dev/input e /dev/uinput
+#               (grupo 'input' + regra udev; veja packaging/linux/).
+backend = "auto"
+# Só no backend evdev: capturar teclado/mouse com exclusividade (grab) no modo
+# remoto, suprimindo a entrada local. true = comportamento de KVM (recomendado);
+# false = a entrada vai para as duas máquinas (modo conservador, sem risco de
+# "trancar" o controle). O atalho e o fim do processo sempre liberam o grab.
+grab = true
 
 [audio]  # Função 2: compartilhamento de áudio (fones de ouvido)
 # No emissor (máquina cuja saída de som será transmitida): endereço de escuta.
@@ -138,6 +152,14 @@ class Config:
     @property
     def toggle_hotkey(self) -> str:
         return str(self._get("input", "toggle_hotkey"))
+
+    @property
+    def input_backend(self) -> str:
+        return str(self._get("input", "backend"))
+
+    @property
+    def input_grab(self) -> bool:
+        return bool(self._get("input", "grab"))
 
     # --- [audio] ---
     @property

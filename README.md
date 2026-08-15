@@ -9,9 +9,10 @@ duas funções:
 2. **Áudio / fones de ouvido** — o som de um computador é transmitido pela
    rede e reproduzido nos fones conectados ao outro.
 
-Compatível com **Linux** (desenvolvido com foco em **Arch Linux**, sessão X11)
-e **Windows 10/11**. As duas máquinas podem estar em qualquer combinação de
-sistemas (Arch ⇄ Arch, Arch ⇄ Windows, Windows ⇄ Windows).
+Compatível com **Linux** (foco em **Arch Linux**, em X11 **e Wayland/Hyprland**
+via backend evdev) e **Windows 10/11**. As duas máquinas podem estar em
+qualquer combinação de sistemas e ambientes gráficos (Arch ⇄ Arch, Arch ⇄
+Windows, Hyprland ⇄ Qtile, etc.).
 
 ```
    DESKTOP (servidor/emissor)                LAPTOP (cliente/receptor)
@@ -46,15 +47,19 @@ makepkg -si
 Opção B — pipx:
 
 ```bash
-sudo pacman -S python-pipx tk
+sudo pacman -S python-pipx tk python-evdev
 yay -S python-pynput
 git clone https://github.com/CauaVenturaDev/Desktop-laptop.git
 pipx install ./Desktop-laptop
 ```
 
-> **Wayland:** a captura/injeção global de teclado e mouse usa X11. Em
-> GNOME/KDE com Wayland, inicie uma sessão X11 (Xorg) para usar a função de
-> entrada. A função de áudio funciona em qualquer sessão.
+> **Wayland / Hyprland:** a função de teclado/mouse tem dois backends. O
+> padrão (`pynput`) funciona em X11 e Windows. Para **Wayland (Hyprland,
+> Sway, GNOME/KDE Wayland)** o app usa automaticamente o backend **`evdev`**,
+> que opera em nível de kernel e funciona em qualquer compositor. Ele exige
+> uma configuração de permissões única — veja
+> [Backend de entrada e Wayland](#backend-de-entrada-e-wayland) abaixo. A
+> função de áudio funciona em qualquer sessão, sem configuração extra.
 
 ### Windows 10 / 11
 
@@ -106,6 +111,58 @@ Pressione **`Ctrl+Alt+F12`** (configurável em `toggle_hotkey`) para enviar o
 teclado/mouse para a máquina remota; pressione de novo para voltar. Se a
 conexão cair, o controle volta automaticamente para a máquina local e as
 teclas pressionadas são soltas na remota.
+
+### Backend de entrada e Wayland
+
+A função de teclado/mouse tem dois backends, escolhidos por `backend` em
+`[input]` (padrão `"auto"`):
+
+| Backend | Onde funciona | Permissões |
+|---|---|---|
+| `pynput` | X11 e Windows 10/11 | nenhuma |
+| `evdev` | **Linux em nível de kernel**: Wayland (Hyprland/Sway/GNOME/KDE), X11 e console | grupo `input` + regra udev |
+
+Com `"auto"`: Windows e Linux/X11 usam `pynput`; Linux/Wayland usa `evdev`.
+Assim, no seu caso (**Arch Hyprland ⇄ Arch Qtile**) tudo funciona: o lado
+Hyprland usa `evdev` e o lado Qtile pode usar qualquer um dos dois.
+
+**Habilitar o backend evdev (uma vez por máquina):**
+
+```bash
+perishare input-devices              # diagnóstico: dispositivos e permissões
+./packaging/linux/setup-permissions.sh   # script interativo, pede confirmação
+```
+
+O script pergunta antes de cada passo e nunca sobrescreve nada sem confirmar.
+Se preferir fazer manualmente:
+
+```bash
+sudo usermod -aG input $USER         # e refaça o login
+sudo cp packaging/linux/99-perishare-uinput.rules /etc/udev/rules.d/
+sudo cp packaging/linux/perishare-uinput.conf     /etc/modules-load.d/
+sudo modprobe uinput
+sudo udevadm control --reload-rules && sudo udevadm trigger
+```
+
+(Instalando pelo pacote do Arch, a regra udev e o módulo já vão junto; só
+falta entrar no grupo `input`.)
+
+**Segurança do backend evdev.** Para suprimir a entrada local no modo remoto,
+o `evdev` captura o teclado/mouse com exclusividade (*grab*). Isso é feito com
+várias travas de segurança para você nunca ficar "trancado":
+
+- o *grab* só acontece no **modo remoto**; no modo local a máquina é sua;
+- o **atalho de alternância** é lido direto do kernel e sempre libera o
+  controle, mesmo com o *grab* ativo;
+- **qualquer** saída (atalho, `Ctrl+C`, `stop`, `SIGTERM`, queda da conexão)
+  libera o *grab*; e se o processo morrer, o kernel o libera sozinho — não há
+  como ficar preso com o programa encerrado;
+- quem prefere zero risco pode usar `grab = false`: a entrada vai para as duas
+  máquinas ao mesmo tempo (sem suprimir a local).
+
+O dispositivo virtual de injeção (lado cliente) não interfere no seu teclado
+físico. Fidelidade máxima é entre Linux ⇄ Linux (envia o código de tecla do
+kernel); para Windows/X11 há um mapa de layout US para letras e símbolos.
 
 ### Função 2 — áudio / fones
 
@@ -160,11 +217,14 @@ systemctl --user enable --now perishare-audio-recv
 | Sintoma | Causa provável / solução |
 |---|---|
 | `Falha de autenticação` | O `secret` difere entre as máquinas — copie o mesmo `config.toml`. |
-| Entrada não funciona no Linux | Sessão Wayland: use uma sessão X11 (Xorg). |
+| Entrada não funciona em Wayland | Habilite o backend evdev: `perishare input-devices` e `./packaging/linux/setup-permissions.sh` (grupo `input` + regra udev). |
+| `Sem permissão para ... /dev/uinput` | Instale a regra udev e entre no grupo `input`; rode `perishare input-devices` para diagnosticar. |
+| `Nenhum teclado/mouse encontrado` | Entre no grupo `input` (`sudo usermod -aG input $USER`) e refaça o login. |
 | Áudio picotando | Aumente `blocksize` (ex.: 960) na configuração das duas máquinas. |
 | `Servidor ... indisponível` | Confira `server_host`, se o serviço está rodando na outra máquina e o firewall (portas 42800/42801 TCP). |
-| Atalho não alterna | Alguma tecla do atalho pode estar em uso pelo sistema; troque `toggle_hotkey` (formato do pynput, ex.: `<ctrl>+<alt>+<f9>`). |
-| Tecla exótica não repete na outra máquina | Teclas sem caractere/nome usam código da plataforma, fiel apenas entre sistemas iguais; letras, números, acentos e teclas especiais funcionam entre Linux ⇄ Windows. |
+| Atalho não alterna | Alguma tecla do atalho pode estar em uso pelo sistema; troque `toggle_hotkey` (ex.: `<ctrl>+<alt>+<f9>`). |
+| Medo de "trancar" o teclado (evdev) | O atalho e o fim do processo sempre liberam o *grab*; ou use `grab = false` para nunca capturar com exclusividade. |
+| Acento/símbolo errado entre Linux e Windows | O mapa cross-plataforma é US; entre Linux ⇄ Linux (evdev) a fidelidade é total via código de tecla do kernel. |
 
 ## Desenvolvimento
 
@@ -175,10 +235,12 @@ pip install -e .                          # instalação editável
 
 Arquitetura em resumo: mensagens TCP com prefixo de tamanho
 (`perishare/netmsg.py`); handshake HMAC + AES-256-GCM
-(`perishare/security.py`); captura/injeção de entrada com pynput
-(`perishare/inputshare/`); captura/reprodução de áudio com
-sounddevice/PortAudio, PCM s16le e buffer de jitter
-(`perishare/audioshare/`).
+(`perishare/security.py`); entrada com dois backends selecionados em
+`perishare/inputshare/backends.py` — `pynput` (X11/Windows, em `server.py`/
+`client.py`) e `evdev`/uinput em nível de kernel (`evdev_server.py`/
+`evdev_client.py`), com o transporte compartilhado em `transport.py` e a
+tradução de teclas em `keymap.py`; captura/reprodução de áudio com
+sounddevice/PortAudio, PCM s16le e buffer de jitter (`perishare/audioshare/`).
 
 ## Licença
 

@@ -38,6 +38,10 @@ def _build_parser() -> argparse.ArgumentParser:
 
     sub.add_parser("devices", help="lista os dispositivos de áudio disponíveis")
     sub.add_parser(
+        "input-devices",
+        help="Linux: diagnostica teclados/mouses e o acesso a /dev/uinput (evdev)",
+    )
+    sub.add_parser(
         "input-server",
         help="máquina com teclado/mouse físicos: captura e envia a entrada",
     )
@@ -86,6 +90,81 @@ def _cmd_devices() -> int:
     return 0
 
 
+def _cmd_input_devices() -> int:
+    """Diagnóstico (somente leitura) do backend evdev: dispositivos e permissões.
+
+    Não modifica nada no sistema — apenas verifica e imprime instruções.
+    """
+    if not sys.platform.startswith("linux"):
+        print(
+            "O backend evdev existe apenas no Linux. Em Windows/X11 o app usa o "
+            "backend pynput, que não precisa deste diagnóstico."
+        )
+        return 0
+    try:
+        import evdev
+        from evdev import ecodes
+    except Exception as exc:
+        print(f"Pacote 'evdev' indisponível ({exc}).")
+        print("Instale com: sudo pacman -S python-evdev   (ou: pip install evdev)")
+        return 1
+
+    print("Dispositivos de entrada em /dev/input:\n")
+    keyboards = pointers = readable = 0
+    denied = 0
+    for path in evdev.list_devices():
+        try:
+            dev = evdev.InputDevice(path)
+        except PermissionError:
+            denied += 1
+            print(f"  {path}: SEM PERMISSÃO de leitura")
+            continue
+        except OSError:
+            continue
+        readable += 1
+        caps = dev.capabilities()
+        keys = set(caps.get(ecodes.EV_KEY, []))
+        rels = set(caps.get(ecodes.EV_REL, []))
+        is_kbd = ecodes.KEY_A in keys or ecodes.KEY_ENTER in keys
+        is_ptr = (ecodes.REL_X in rels and ecodes.REL_Y in rels) or ecodes.BTN_LEFT in keys
+        role = []
+        if is_kbd:
+            role.append("teclado")
+            keyboards += 1
+        if is_ptr:
+            role.append("mouse/ponteiro")
+            pointers += 1
+        print(f"  {path}: {dev.name}  [{', '.join(role) or 'outro'}]")
+        dev.close()
+
+    print()
+    print(f"Legíveis: {readable} | teclados: {keyboards} | ponteiros: {pointers}")
+    if denied:
+        print(
+            f"\n{denied} dispositivo(s) sem permissão. Entre no grupo 'input':\n"
+            "  sudo usermod -aG input $USER    (e refaça o login)"
+        )
+
+    # Acesso ao /dev/uinput (injeção). Testa sem manter o dispositivo aberto.
+    print()
+    try:
+        ui = evdev.UInput(name="PeriShare Test")
+        ui.close()
+        print("Injeção via /dev/uinput: OK")
+    except PermissionError:
+        print(
+            "Injeção via /dev/uinput: SEM PERMISSÃO.\n"
+            "  Instale a regra udev packaging/linux/99-perishare-uinput.rules em\n"
+            "  /etc/udev/rules.d/, rode 'sudo modprobe uinput' e entre no grupo 'input'."
+        )
+    except Exception as exc:
+        print(
+            f"Injeção via /dev/uinput: indisponível ({exc}).\n"
+            "  Carregue o módulo do kernel: sudo modprobe uinput"
+        )
+    return 0
+
+
 def main(argv=None) -> int:
     args = _build_parser().parse_args(argv)
     logging.basicConfig(
@@ -98,6 +177,8 @@ def main(argv=None) -> int:
         return _cmd_init(args)
     if args.command == "devices":
         return _cmd_devices()
+    if args.command == "input-devices":
+        return _cmd_input_devices()
 
     if args.command == "gui":
         from .gui import run_gui
@@ -105,17 +186,24 @@ def main(argv=None) -> int:
         return run_gui(args.config)
 
     cfg = config_mod.load(args.config)
-    services = {
-        "input-server": "perishare.inputshare.server:InputServer",
-        "input-client": "perishare.inputshare.client:InputClient",
-        "audio-send": "perishare.audioshare.sender:AudioSender",
-        "audio-recv": "perishare.audioshare.receiver:AudioReceiver",
-    }
-    module_name, _, class_name = services[args.command].partition(":")
-    import importlib
+    if args.command == "input-server":
+        from .inputshare.backends import make_input_server
 
-    service_cls = getattr(importlib.import_module(module_name), class_name)
-    service = service_cls(cfg)
+        service = make_input_server(cfg)
+    elif args.command == "input-client":
+        from .inputshare.backends import make_input_client
+
+        service = make_input_client(cfg)
+    else:
+        audio = {
+            "audio-send": "perishare.audioshare.sender:AudioSender",
+            "audio-recv": "perishare.audioshare.receiver:AudioReceiver",
+        }
+        module_name, _, class_name = audio[args.command].partition(":")
+        import importlib
+
+        service_cls = getattr(importlib.import_module(module_name), class_name)
+        service = service_cls(cfg)
     try:
         service.run_forever()
     except RuntimeError as exc:

@@ -1,0 +1,11 @@
+# Regra udev do PeriShare: dá ao grupo "input" acesso de leitura/escrita ao
+# dispositivo /dev/uinput, necessário para o backend evdev criar o teclado e
+# o mouse virtuais (injeção de entrada — máquina cliente/controlada).
+#
+# Instalação (com consentimento; o app nunca faz isso sozinho):
+#   sudo cp packaging/linux/99-perishare-uinput.rules /etc/udev/rules.d/
+#   sudo udevadm control --reload-rules && sudo udevadm trigger
+#
+# O usuário também precisa pertencer ao grupo "input":
+#   sudo usermod -aG input $USER    # e refazer o login
+KERNEL=="uinput", GROUP="input", MODE="0660", OPTIONS+="static_node=uinput"

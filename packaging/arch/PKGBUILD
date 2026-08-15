@@ -10,7 +10,8 @@ pkgdesc="Compartilhamento de periféricos (teclado, mouse e áudio/fones) entre 
 arch=('any')
 url="https://github.com/CauaVenturaDev/Desktop-laptop"
 license=('MIT')
-depends=('python' 'python-pynput' 'python-sounddevice' 'python-cryptography' 'tk')
+depends=('python' 'python-pynput' 'python-sounddevice' 'python-cryptography'
+         'python-evdev' 'tk')
 makedepends=('git' 'python-build' 'python-installer' 'python-wheel' 'python-setuptools')
 provides=('perishare')
 conflicts=('perishare')
@@ -35,4 +36,12 @@ package() {
     "$pkgdir/usr/lib/systemd/user/perishare-input-client.service"
   install -Dm644 packaging/systemd/perishare-audio-recv.service \
     "$pkgdir/usr/lib/systemd/user/perishare-audio-recv.service"
+
+  # Backend evdev/uinput: regra udev (acesso a /dev/uinput) e carregamento do
+  # módulo. São caminhos do próprio pacote; o usuário ainda precisa entrar no
+  # grupo 'input' (sudo usermod -aG input $USER) — o pacote não altera grupos.
+  install -Dm644 packaging/linux/99-perishare-uinput.rules \
+    "$pkgdir/usr/lib/udev/rules.d/99-perishare-uinput.rules"
+  install -Dm644 packaging/linux/perishare-uinput.conf \
+    "$pkgdir/usr/lib/modules-load.d/perishare-uinput.conf"
 }

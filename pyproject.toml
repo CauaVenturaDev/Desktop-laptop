@@ -23,6 +23,9 @@ dependencies = [
     "pynput>=1.7.6",
     "sounddevice>=0.4.6",
     "cryptography>=41.0",
+    # Backend de entrada em nível de kernel (funciona em Wayland/Hyprland).
+    # Só no Linux; no Windows a função de entrada usa o pynput.
+    "evdev>=1.6; sys_platform == 'linux'",
 ]
 
 [project.scripts]
