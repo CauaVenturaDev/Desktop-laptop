@@ -1,0 +1,35 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "perishare"
+version = "0.1.0"
+description = "Compartilhamento de periféricos (teclado, mouse e áudio/fones) entre computadores via rede local — Linux (Arch) e Windows 10/11"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [{ name = "CauaVenturaDev" }]
+keywords = ["kvm", "keyboard", "mouse", "audio", "sharing", "network"]
+classifiers = [
+    "Environment :: Console",
+    "Operating System :: POSIX :: Linux",
+    "Operating System :: Microsoft :: Windows :: Windows 10",
+    "Operating System :: Microsoft :: Windows :: Windows 11",
+    "Programming Language :: Python :: 3",
+    "Topic :: System :: Networking",
+]
+dependencies = [
+    "pynput>=1.7.6",
+    "sounddevice>=0.4.6",
+    "cryptography>=41.0",
+]
+
+[project.scripts]
+perishare = "perishare.cli:main"
+
+[project.gui-scripts]
+perishare-gui = "perishare.gui:main"
+
+[tool.setuptools.packages.find]
+include = ["perishare*"]

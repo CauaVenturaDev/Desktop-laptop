@@ -1,0 +1,38 @@
+# Maintainer: CauaVenturaDev
+# Build local a partir do repositório git (estilo AUR -git).
+# Uso: cd packaging/arch && makepkg -si
+# Dependência do AUR: python-pynput (instale antes, ex.: yay -S python-pynput)
+
+pkgname=perishare-git
+pkgver=r1
+pkgrel=1
+pkgdesc="Compartilhamento de periféricos (teclado, mouse e áudio/fones) entre PCs via rede local"
+arch=('any')
+url="https://github.com/CauaVenturaDev/Desktop-laptop"
+license=('MIT')
+depends=('python' 'python-pynput' 'python-sounddevice' 'python-cryptography' 'tk')
+makedepends=('git' 'python-build' 'python-installer' 'python-wheel' 'python-setuptools')
+provides=('perishare')
+conflicts=('perishare')
+source=("perishare::git+https://github.com/CauaVenturaDev/Desktop-laptop.git")
+sha256sums=('SKIP')
+
+pkgver() {
+  cd perishare
+  printf "r%s.%s" "$(git rev-list --count HEAD)" "$(git rev-parse --short HEAD)"
+}
+
+build() {
+  cd perishare
+  python -m build --wheel --no-isolation
+}
+
+package() {
+  cd perishare
+  python -m installer --destdir="$pkgdir" dist/*.whl
+  install -Dm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+  install -Dm644 packaging/systemd/perishare-input-client.service \
+    "$pkgdir/usr/lib/systemd/user/perishare-input-client.service"
+  install -Dm644 packaging/systemd/perishare-audio-recv.service \
+    "$pkgdir/usr/lib/systemd/user/perishare-audio-recv.service"
+}

@@ -1,0 +1,24 @@
+# Exemplo de configuração do PeriShare.
+# Gere a sua com "perishare init" (cria um 'secret' aleatório) e copie o
+# MESMO arquivo para as duas máquinas, ajustando apenas "server_host" na
+# máquina cliente/receptora.
+
+[general]
+secret = "TROQUE-ME: use 'perishare init' para gerar um segredo aleatório"
+encrypt = true
+
+[input]  # Função 1: teclado e mouse
+listen_host = "0.0.0.0"        # usado pelo input-server
+server_host = "192.168.0.10"   # usado pelo input-client: IP do servidor
+port = 42800
+toggle_hotkey = "<ctrl>+<alt>+<f12>"
+
+[audio]  # Função 2: áudio / fones de ouvido
+listen_host = "0.0.0.0"        # usado pelo audio-send
+server_host = "192.168.0.10"   # usado pelo audio-recv: IP do emissor
+port = 42801
+samplerate = 48000
+channels = 2
+blocksize = 480                # 10 ms por bloco a 48 kHz
+capture_device = ""            # ex.: "monitor" (Linux) ou "Stereo Mix" (Windows)
+playback_device = ""           # vazio = saída padrão (os fones)
