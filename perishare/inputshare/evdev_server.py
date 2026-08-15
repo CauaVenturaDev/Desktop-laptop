@@ -29,6 +29,7 @@ from __future__ import annotations
 
 import atexit
 import logging
+import os
 import selectors
 import signal
 import threading
@@ -348,9 +349,29 @@ def _open_input_devices() -> list:
             devices.append(dev)
         else:
             dev.close()
-    if not devices and denied:
-        raise RuntimeError(_perm_denied_msg())
+    if not devices:
+        # O evdev.list_devices() oculta os dispositivos ilegíveis, então
+        # "lista vazia" quase sempre é falta de permissão de leitura, não
+        # ausência de hardware. Diagnostica pelos nós brutos e pelo grupo.
+        raise RuntimeError(_no_devices_msg(saw_denied=denied > 0))
     return devices
+
+
+def _user_in_group(name: str) -> bool:
+    try:
+        import grp
+
+        entry = grp.getgrnam(name)
+    except (KeyError, ImportError):
+        return False
+    if entry.gr_gid in os.getgroups():
+        return True
+    try:
+        import getpass
+
+        return getpass.getuser() in entry.gr_mem
+    except Exception:
+        return os.environ.get("USER", "") in entry.gr_mem
 
 
 def _missing_evdev_msg(exc) -> str:
@@ -362,17 +383,30 @@ def _missing_evdev_msg(exc) -> str:
     )
 
 
-def _no_devices_msg() -> str:
-    return (
-        "Nenhum teclado/mouse encontrado em /dev/input. Confira as permissões "
-        "(o usuário precisa estar no grupo 'input'): sudo usermod -aG input $USER "
-        "e refaça o login. Veja packaging/linux/."
-    )
+def _no_devices_msg(saw_denied: bool = False) -> str:
+    import glob
 
-
-def _perm_denied_msg() -> str:
+    nodes = glob.glob("/dev/input/event*")
+    if not nodes and not saw_denied:
+        return (
+            "Nenhum dispositivo em /dev/input/event*. Isso é raro: verifique se há "
+            "teclado/mouse conectados e se o kernel os expõe."
+        )
+    if _user_in_group("input"):
+        return (
+            "Não foi possível ler os dispositivos de /dev/input, embora você já "
+            "esteja no grupo 'input' — a SESSÃO ATUAL ainda não aplicou o grupo.\n"
+            "Faça logout/login (ou reinicie). Para testar sem relogar, rode nesta "
+            "mesma shell:\n"
+            "  newgrp input\n"
+            "  perishare input-server\n"
+            "Confira com 'id' que 'input' aparece nos seus grupos."
+        )
     return (
-        "Sem permissão para ler /dev/input/event*. Entre no grupo 'input': "
-        "sudo usermod -aG input $USER (e refaça o login). "
-        "Nenhuma permissão é alterada automaticamente pelo app."
+        "Sem permissão para ler /dev/input/event*. Seu usuário não está no grupo "
+        "'input'. Rode:\n"
+        "  sudo usermod -aG input $USER\n"
+        "e faça logout/login (o grupo só vale em sessões novas). Alternativa sem "
+        'grupo: use backend = "pynput" no servidor (X11). O app não altera '
+        "permissões sozinho."
     )
