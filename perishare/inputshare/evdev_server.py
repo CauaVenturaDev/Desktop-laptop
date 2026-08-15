@@ -52,9 +52,10 @@ class EvdevInputServer(ServerTransport):
         self._devices: list = []
         self._selector: selectors.BaseSelector | None = None
         self._hotkey_tokens: list = []
+        self._hotkey_codes: set = set()
 
         self._remote = False
-        self._toggle_latched = False
+        self._pending_toggle = False
         self._grabbed = False
         self._state_lock = threading.RLock()
 
@@ -78,6 +79,7 @@ class EvdevInputServer(ServerTransport):
             raise RuntimeError(
                 f"toggle_hotkey inválido para o backend evdev: {self._hotkey_str!r}"
             )
+        self._hotkey_codes = set().union(*self._hotkey_tokens)
 
         self._devices = _open_input_devices()
         if not self._devices:
@@ -179,14 +181,19 @@ class EvdevInputServer(ServerTransport):
         elif value == 0:
             self._pressed.discard(code)
 
-        # Detecção do atalho a partir do fluxo bruto (funciona mesmo com grab).
-        if self._hotkey_active():
-            if not self._toggle_latched:
-                self._toggle_latched = True
+        # Alternância: detecta a combinação, mas só EFETIVA (grab/ungrab) quando
+        # o atalho é totalmente SOLTO. Trocar o grab com as teclas ainda
+        # pressionadas faria o X nunca receber o "release" e repetir a tecla
+        # infinitamente (ex.: ^[[1;7F). Enquanto pendente, engolimos as teclas
+        # do atalho e esperamos soltar tudo.
+        if self._pending_toggle:
+            if self._hotkey_codes.isdisjoint(self._pressed):
+                self._pending_toggle = False
                 self._toggle()
-            return  # não encaminha as teclas do atalho
-        else:
-            self._toggle_latched = False
+            return
+        if self._hotkey_active():
+            self._pending_toggle = True
+            return
 
         if not self._remote:
             return

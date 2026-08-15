@@ -56,6 +56,7 @@ class EvdevServerStateMachineTest(unittest.TestCase):
         )
         server = EvdevInputServer(cfg)
         server._hotkey_tokens = keymap.parse_hotkey_to_evdev(cfg.toggle_hotkey)
+        server._hotkey_codes = set().union(*server._hotkey_tokens)
         server._devices = [FakeDevice("kbd"), FakeDevice("mouse")]
         self._has_client = [True]
         server._has_client = lambda: self._has_client[0]
@@ -66,16 +67,20 @@ class EvdevServerStateMachineTest(unittest.TestCase):
     def _feed(self, server, event):
         server._handle_event(event, ecodes)
 
-    def _toggle_hotkey(self, server):
+    def _press_hotkey(self, server):
         self._feed(server, _key(ecodes.KEY_LEFTCTRL, 1))
         self._feed(server, _key(ecodes.KEY_LEFTALT, 1))
         self._feed(server, _key(ecodes.KEY_END, 1))
 
     def _release_hotkey(self, server):
-        # Como no uso real: o usuário solta o atalho antes de continuar.
         self._feed(server, _key(ecodes.KEY_END, 0))
         self._feed(server, _key(ecodes.KEY_LEFTALT, 0))
         self._feed(server, _key(ecodes.KEY_LEFTCTRL, 0))
+
+    def _toggle(self, server):
+        # A troca só efetiva ao SOLTAR o atalho (evita tecla presa no X).
+        self._press_hotkey(server)
+        self._release_hotkey(server)
 
     def test_local_mode_does_not_forward_or_grab(self):
         server = self._make()
@@ -84,14 +89,25 @@ class EvdevServerStateMachineTest(unittest.TestCase):
         self.assertEqual(self.captured, [])
         self.assertFalse(any(d.grabbed for d in server._devices))
 
+    def test_toggle_only_takes_effect_on_release(self):
+        server = self._make()
+        # Só de pressionar (sem soltar) NÃO troca nem captura — evita tecla presa.
+        self._press_hotkey(server)
+        self.assertFalse(server._remote)
+        self.assertFalse(any(d.grabbed for d in server._devices))
+        self.assertEqual(self.captured, [])
+        # Ao soltar o atalho, aí sim troca e captura.
+        self._release_hotkey(server)
+        self.assertTrue(server._remote)
+        self.assertTrue(all(d.grabbed for d in server._devices))
+        self.assertEqual(self.captured, [])
+
     def test_toggle_grabs_and_forwards(self):
         server = self._make()
-        self._toggle_hotkey(server)
+        self._toggle(server)
         self.assertTrue(server._remote)
         self.assertTrue(all(d.grabbed for d in server._devices))
         # O atalho em si não é encaminhado.
-        self.assertEqual(self.captured, [])
-        self._release_hotkey(server)
         self.assertEqual(self.captured, [])
 
         # Digitar no modo remoto encaminha com o código evdev bruto.
@@ -104,20 +120,9 @@ class EvdevServerStateMachineTest(unittest.TestCase):
         self._feed(server, _key(ecodes.KEY_A, 0))
         self.assertEqual(self.captured[-1]["down"], False)
 
-    def test_hotkey_modifiers_not_released_on_remote(self):
-        server = self._make()
-        self._toggle_hotkey(server)
-        self.captured.clear()
-        # Soltar os modificadores do atalho não deve virar "release" na remota.
-        self._feed(server, _key(ecodes.KEY_END, 0))
-        self._feed(server, _key(ecodes.KEY_LEFTALT, 0))
-        self._feed(server, _key(ecodes.KEY_LEFTCTRL, 0))
-        self.assertEqual(self.captured, [])
-
     def test_mouse_move_and_button(self):
         server = self._make()
-        self._toggle_hotkey(server)
-        self._release_hotkey(server)
+        self._toggle(server)
         self.captured.clear()
         self._feed(server, FakeEvent(ecodes.EV_REL, ecodes.REL_X, 5))
         self._feed(server, FakeEvent(ecodes.EV_REL, ecodes.REL_Y, -3))
@@ -128,8 +133,7 @@ class EvdevServerStateMachineTest(unittest.TestCase):
 
     def test_client_lost_releases_and_ungrabs(self):
         server = self._make()
-        self._toggle_hotkey(server)
-        self._release_hotkey(server)
+        self._toggle(server)
         self._feed(server, _key(ecodes.KEY_A, 1))  # tecla pressionada no remoto
         self.captured.clear()
         server.on_client_lost()
@@ -143,23 +147,22 @@ class EvdevServerStateMachineTest(unittest.TestCase):
     def test_toggle_without_client_stays_local(self):
         server = self._make()
         self._has_client[0] = False
-        self._toggle_hotkey(server)
+        self._toggle(server)
         self.assertFalse(server._remote)
         self.assertFalse(any(d.grabbed for d in server._devices))
 
     def test_grab_false_never_grabs(self):
         server = self._make(grab=False)
-        self._toggle_hotkey(server)
+        self._toggle(server)
         self.assertTrue(server._remote)
         self.assertFalse(any(d.grabbed for d in server._devices))
-        self._release_hotkey(server)
         # Ainda encaminha eventos, só não captura com exclusividade.
         self._feed(server, _key(ecodes.KEY_A, 1))
         self.assertEqual(self.captured[-1]["code"], ecodes.KEY_A)
 
     def test_stop_ungrabs_and_closes(self):
         server = self._make()
-        self._toggle_hotkey(server)
+        self._toggle(server)
         self.assertTrue(all(d.grabbed for d in server._devices))
         devices = list(server._devices)
         server.stop()
@@ -168,13 +171,10 @@ class EvdevServerStateMachineTest(unittest.TestCase):
 
     def test_toggle_back_to_local_ungrabs(self):
         server = self._make()
-        self._toggle_hotkey(server)
+        self._toggle(server)                 # local -> remoto
         self.assertTrue(server._remote)
-        # Solta o atalho e aciona de novo para voltar ao local.
-        self._feed(server, _key(ecodes.KEY_END, 0))
-        self._feed(server, _key(ecodes.KEY_LEFTALT, 0))
-        self._feed(server, _key(ecodes.KEY_LEFTCTRL, 0))
-        self._toggle_hotkey(server)
+        self.assertTrue(all(d.grabbed for d in server._devices))
+        self._toggle(server)                 # remoto -> local
         self.assertFalse(server._remote)
         self.assertFalse(any(d.grabbed for d in server._devices))
 
