@@ -245,6 +245,24 @@ systemctl --user enable --now perishare-audio-recv
 | Atalho não alterna | Alguma tecla do atalho pode estar em uso pelo sistema; troque `toggle_hotkey` (ex.: `<ctrl>+<alt>+<f9>`). |
 | Medo de "trancar" o teclado (evdev) | O atalho e o fim do processo sempre liberam o *grab*; ou use `grab = false` para nunca capturar com exclusividade. |
 | Acento/símbolo errado entre Linux e Windows | O mapa cross-plataforma é US; entre Linux ⇄ Linux (evdev) a fidelidade é total via código de tecla do kernel. |
+| Periférico Bluetooth reconectou e parou | O `input-server` abre os dispositivos ao iniciar; se um teclado/mouse (BT ou USB) cai e volta, reinicie o `input-server` para capturar o novo nó. |
+| Fone Bluetooth com atraso no áudio | Latência do A2DP soma à da rede; aumente `blocksize` se picotar. O microfone de fone BT (HSP/HFP) tem baixa qualidade — mas normalmente capturamos o som do sistema, não o mic. |
+
+## Bluetooth
+
+Funciona: o app opera no nível de dispositivo do sistema, então **teclado,
+mouse e fones Bluetooth são tratados como quaisquer outros** — desde que já
+estejam pareados e conectados pelo próprio SO (o app não faz o pareamento).
+
+- **Teclado/mouse (Função 1):** um dispositivo BT aparece como um
+  `/dev/input/event*` normal (Linux) ou HID (Windows); o backend evdev ou
+  pynput captura igual a um USB, inclusive o *grab*.
+- **Fones (Função 2):** aponte `playback_device` para o fone BT (ou deixe
+  vazio, se ele já for a saída padrão). A latência do Bluetooth (A2DP) soma à
+  da rede — ótimo para ouvir o som do sistema, menos ideal para sincronia fina.
+- **Limitação de hot-plug:** os dispositivos de entrada são abertos no início
+  do `input-server`. Se um periférico BT desconectar e reconectar no meio da
+  sessão, reinicie o serviço (o mesmo vale para reconexão USB).
 
 ## Desenvolvimento
 
