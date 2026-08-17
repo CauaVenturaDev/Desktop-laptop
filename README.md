@@ -70,10 +70,17 @@ pipx install ./Desktop-laptop
 ### Windows 10 / 11
 
 1. Instale o [Python 3.11+](https://www.python.org/downloads/) marcando
-   **"Add python.exe to PATH"**.
-2. Baixe/clone este repositório e execute no PowerShell:
+   **"Add python.exe to PATH"**. Reabra o PowerShell depois.
+2. **Baixe o código** desta máquina. Sem Git configurado, o mais fácil é o ZIP:
+   na página do repositório, botão verde **Code → Download ZIP**, e extraia
+   (ex.: para `C:\Users\<você>\Desktop-laptop`). Com Git: `git clone <url>`.
+3. **Entre na pasta do projeto** no PowerShell e rode o instalador. O caminho
+   `packaging\windows\install.ps1` é relativo à pasta atual — se você não
+   estiver dentro do projeto, dá o erro "arquivo não existe":
 
 ```powershell
+cd C:\Users\<você>\Desktop-laptop      # a pasta onde você extraiu/clonou
+dir packaging\windows\install.ps1      # confirme que o arquivo aparece
 powershell -ExecutionPolicy Bypass -File packaging\windows\install.ps1
 ```
 

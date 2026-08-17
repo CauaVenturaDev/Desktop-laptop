@@ -14,22 +14,28 @@ $repoRoot = Resolve-Path (Join-Path $PSScriptRoot "..\..")
 $installDir = Join-Path $env:LOCALAPPDATA "perishare"
 $venvDir = Join-Path $installDir "venv"
 
-function Find-Python {
-    foreach ($candidate in @("py -3", "python")) {
+function Get-PythonCmd {
+    # Retorna @{ Exe = <executavel>; Pre = @(<args>) } de um Python 3.11+.
+    $tries = @(
+        @{ Exe = "py";      Pre = @("-3") },
+        @{ Exe = "python";  Pre = @() },
+        @{ Exe = "python3"; Pre = @() }
+    )
+    foreach ($t in $tries) {
         try {
-            $version = & $candidate.Split(" ")[0] $candidate.Split(" ")[1..10] --version 2>$null
-            if ($LASTEXITCODE -eq 0 -and $version -match "Python 3\.(1[1-9]|[2-9][0-9])") {
-                return $candidate
+            $version = & $t.Exe @($t.Pre) --version 2>&1
+            if ($LASTEXITCODE -eq 0 -and "$version" -match "Python 3\.(1[1-9]|[2-9]\d)") {
+                return $t
             }
         } catch {}
     }
-    throw "Python 3.11+ nao encontrado. Instale em https://www.python.org/downloads/ e marque 'Add python.exe to PATH'."
+    throw "Python 3.11+ nao encontrado. Instale em https://www.python.org/downloads/ e marque 'Add python.exe to PATH' (e reabra o PowerShell)."
 }
 
-$python = Find-Python
-Write-Host "Usando: $python"
+$py = Get-PythonCmd
+Write-Host "Usando: $($py.Exe) $($py.Pre -join ' ')"
 Write-Host "Criando ambiente virtual em $venvDir ..."
-& $python.Split(" ")[0] $python.Split(" ")[1..10] -m venv $venvDir
+& $py.Exe @($py.Pre) -m venv $venvDir
 
 $pip = Join-Path $venvDir "Scripts\pip.exe"
 & $pip install --upgrade pip | Out-Null
